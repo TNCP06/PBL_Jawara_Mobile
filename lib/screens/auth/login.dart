@@ -7,6 +7,8 @@ import 'package:jawara_pintar_kel_5/widget/login_button.dart';
 import 'package:jawara_pintar_kel_5/widget/system_ui_style.dart';
 import 'package:jawara_pintar_kel_5/widget/text_input_login.dart';
 import 'package:moon_design/moon_design.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +18,32 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  String? errorMessage = '';
+  bool isLogin = true;
+
+  final TextEditingController _controllerEmail = TextEditingController(
+    text: '',
+  );
+  final TextEditingController _controllerPassword = TextEditingController(
+    text: '',
+  );
+
+  Future<void> signInWithEmailAndPassword() async {
+    try {
+      await Auth().signInWithEmailAndPassword(
+        email: _controllerEmail.text,
+        password: _controllerPassword.text,
+      );
+
+      // Navigasi ke halaman dashboard setelah berhasil login
+      context.go('/admin/dashboard');
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        errorMessage = e.message;
+      });
+    }
+  }
+
   bool _showLoginForm = false;
 
   final _loginFormHeight = 350.0;
@@ -184,10 +212,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                         ),
                                   ),
                                   loginUntukMengakses(),
-                                  TextInputLogin(hint: 'Email'),
+                                  TextInputLogin(
+                                    hint: 'Email',
+                                    controller: _controllerEmail,
+                                    keyboardType: TextInputType.emailAddress,
+                                  ),
                                   TextInputLogin(
                                     hint: 'Password',
                                     isPassword: true,
+                                    controller: _controllerPassword,
                                     trailing: Center(
                                       child: Text(
                                         'Show',
@@ -205,7 +238,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   LoginButton(
                                     text: "Login",
-                                    onTap: () => context.go('/admin/dashboard'),
+                                    onTap: () => signInWithEmailAndPassword(),
                                   ),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,

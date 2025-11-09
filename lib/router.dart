@@ -315,8 +315,9 @@ final router = GoRouter(
                   builder: (context, state) {
                     final _ = state.pathParameters['judul']!;
                     final broadcastData = state.extra as KegiatanBroadcast?;
-                    if (broadcastData == null)
+                    if (broadcastData == null) {
                       return const DaftarBroadcastScreen();
+                    }
                     return DetailBroadcastScreen(broadcastData: broadcastData);
                   },
                 ),

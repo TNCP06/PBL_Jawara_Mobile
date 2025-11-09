@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "214879514019",
+    "project_id": "pbl-jawara-1f60b",
+    "storage_bucket": "pbl-jawara-1f60b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:214879514019:android:f6576021645cd2ef8c7e16",
+        "android_client_info": {
+          "package_name": "com.example.jawara_pintar_kel_5"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9xD-suou939vzjXEGXbEqMu0-5jsvuOM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

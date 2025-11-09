@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jawara_pintar_kel_5/constants/constant_colors.dart';
+import 'package:jawara_pintar_kel_5/screens/auth/auth.dart';
 import 'package:jawara_pintar_kel_5/widget/drop_down_trailing_arrow.dart';
 import 'package:jawara_pintar_kel_5/widget/login_button.dart';
 import 'package:jawara_pintar_kel_5/widget/text_input_login.dart';
@@ -14,6 +16,32 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  String? errorMessage;
+  bool isLogin = true;
+
+  final TextEditingController _controllerEmail = TextEditingController(
+    text: '',
+  );
+  final TextEditingController _controllerPassword = TextEditingController(
+    text: '',
+  );
+
+  Future<void> createUserWithEmailAndPassword() async {
+    try {
+      await Auth().createUserWithEmailAndPassword(
+        email: _controllerEmail.text,
+        password: _controllerPassword.text,
+      );
+
+      // Navigasi ke halaman dashboard setelah berhasil login
+      context.go('/login');
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        errorMessage = e.message;
+      });
+    }
+  }
+
   late final TextEditingController _namaController,
       _nikController,
       _emailController,
@@ -178,7 +206,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   title: 'Akun',
                   children: [
                     TextInputLogin(
-                      controller: _emailController,
+                      controller: _controllerEmail,
                       hint: 'Email',
                       keyboardType: TextInputType.emailAddress,
                     ),
@@ -188,7 +216,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       keyboardType: TextInputType.phone,
                     ),
                     TextInputLogin(
-                      controller: _passwordController,
+                      controller: _controllerPassword,
                       hint: 'Password',
                       isPassword: true,
                       trailing: Center(
@@ -271,7 +299,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 ),
                 const SizedBox(height: 32),
-                LoginButton(text: 'Daftar', onTap: () {}, withColor: true),
+                LoginButton(
+                  text: 'Daftar',
+                  onTap: () {
+                    createUserWithEmailAndPassword();
+                  },
+                  withColor: true,
+                ),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
