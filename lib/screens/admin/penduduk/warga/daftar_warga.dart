@@ -13,6 +13,10 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _query = '';
+  String? _filterGender;
+  String? _filterStatus;
+  String? _filterFamily;
+  String? _filterLife;
 
   final List<Map<String, String>> _items = List.generate(8, (i) {
     return {
@@ -25,9 +29,10 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
   });
 
   void _openFilter() {
-    String? gender;
-    String? status;
-    String? family;
+    String? tempGender = _filterGender;
+    String? tempStatus = _filterStatus;
+    String? tempFamily = _filterFamily;
+    String? tempLife = _filterLife;
 
     showModalBottomSheet(
       context: context,
@@ -75,7 +80,7 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        initialValue: gender,
+                        initialValue: tempGender,
                         isExpanded: true,
                         decoration: _dropdownDecoration(),
                         items: const [
@@ -88,16 +93,16 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                             child: Text('Perempuan'),
                           ),
                         ],
-                        onChanged: (v) => setModalState(() => gender = v),
+                        onChanged: (v) => setModalState(() => tempGender = v),
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Status',
+                        'Status Kependudukan',
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        initialValue: status,
+                        initialValue: tempStatus,
                         isExpanded: true,
                         decoration: _dropdownDecoration(),
                         items: const [
@@ -109,12 +114,8 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                             value: 'Nonaktif',
                             child: Text('Nonaktif'),
                           ),
-                          DropdownMenuItem(
-                            value: 'Wafat',
-                            child: Text('Wafat'),
-                          ),
                         ],
-                        onChanged: (v) => setModalState(() => status = v),
+                        onChanged: (v) => setModalState(() => tempStatus = v),
                       ),
                       const SizedBox(height: 16),
                       const Text(
@@ -123,7 +124,7 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                       ),
                       const SizedBox(height: 8),
                       DropdownButtonFormField<String>(
-                        initialValue: family,
+                        initialValue: tempFamily,
                         isExpanded: true,
                         decoration: _dropdownDecoration(),
                         items: const [
@@ -136,7 +137,29 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                             child: Text('Keluarga Besar Blitar'),
                           ),
                         ],
-                        onChanged: (v) => setModalState(() => family = v),
+                        onChanged: (v) => setModalState(() => tempFamily = v),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Status Hidup/Wafat',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: tempLife,
+                        isExpanded: true,
+                        decoration: _dropdownDecoration(),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'Hidup',
+                            child: Text('Hidup'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Wafat',
+                            child: Text('Wafat'),
+                          ),
+                        ],
+                        onChanged: (v) => setModalState(() => tempLife = v),
                       ),
                       const SizedBox(height: 20),
                       Row(
@@ -157,9 +180,10 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                               ),
                               onPressed: () {
                                 setModalState(() {
-                                  gender = null;
-                                  status = null;
-                                  family = null;
+                                  tempGender = null;
+                                  tempStatus = null;
+                                  tempFamily = null;
+                                  tempLife = null;
                                 });
                               },
                               child: const Text(
@@ -182,6 +206,12 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                                 ),
                               ),
                               onPressed: () {
+                                setState(() {
+                                  _filterGender = tempGender;
+                                  _filterStatus = tempStatus;
+                                  _filterFamily = tempFamily;
+                                  _filterLife = tempLife;
+                                });
                                 Navigator.pop(context);
                               },
                               child: const Text(
@@ -224,14 +254,25 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
   }
 
   List<Map<String, String>> get _filtered {
-    if (_query.isEmpty) return _items;
-    return _items
-        .where(
-          (e) =>
-              e['name']!.toLowerCase().contains(_query.toLowerCase()) ||
-              e['nik']!.contains(_query),
-        )
-        .toList();
+    return _items.where((e) {
+      // Filter berdasarkan search query
+      final matchesQuery = _query.isEmpty ||
+          e['name']!.toLowerCase().contains(_query.toLowerCase()) ||
+          e['nik']!.contains(_query);
+
+      // Filter berdasarkan status
+      final matchesStatus =
+          _filterStatus == null || e['status'] == _filterStatus;
+
+      // Filter berdasarkan keluarga
+      final matchesFamily =
+          _filterFamily == null || e['family'] == _filterFamily;
+
+      // Filter berdasarkan status hidup/wafat
+      final matchesLife = _filterLife == null || e['life'] == _filterLife;
+
+      return matchesQuery && matchesStatus && matchesFamily && matchesLife;
+    }).toList();
   }
 
   @override
