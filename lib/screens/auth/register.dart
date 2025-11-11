@@ -1,8 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:jawara_pintar_kel_5/constants/constant_colors.dart';
-import 'package:jawara_pintar_kel_5/screens/auth/auth.dart';
+import 'package:jawara_pintar_kel_5/screens/auth/auth_service.dart';
 import 'package:jawara_pintar_kel_5/widget/drop_down_trailing_arrow.dart';
 import 'package:jawara_pintar_kel_5/widget/login_button.dart';
 import 'package:jawara_pintar_kel_5/widget/text_input_login.dart';
@@ -19,6 +18,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? errorMessage;
   bool isLogin = true;
 
+  final authService = AuthService();
+
   final TextEditingController _controllerEmail = TextEditingController(
     text: '',
   );
@@ -28,17 +29,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> createUserWithEmailAndPassword() async {
     try {
-      await Auth().createUserWithEmailAndPassword(
-        email: _controllerEmail.text,
-        password: _controllerPassword.text,
+      await authService.signUpWithEmailPassword(
+        _controllerEmail.text,
+        _controllerPassword.text,
       );
 
       // Navigasi ke halaman dashboard setelah berhasil login
       context.go('/login');
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        errorMessage = e.message;
-      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Registration failed: $e'),
+        ),
+      );
     }
   }
 

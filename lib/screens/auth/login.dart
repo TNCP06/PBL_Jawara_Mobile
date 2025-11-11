@@ -7,8 +7,7 @@ import 'package:jawara_pintar_kel_5/widget/login_button.dart';
 import 'package:jawara_pintar_kel_5/widget/system_ui_style.dart';
 import 'package:jawara_pintar_kel_5/widget/text_input_login.dart';
 import 'package:moon_design/moon_design.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'auth.dart';
+import 'auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,8 +17,10 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  String? errorMessage = '';
   bool isLogin = true;
+
+  // get auth service
+  final authService = AuthService();
 
   final TextEditingController _controllerEmail = TextEditingController(
     text: '',
@@ -30,17 +31,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> signInWithEmailAndPassword() async {
     try {
-      await Auth().signInWithEmailAndPassword(
-        email: _controllerEmail.text,
-        password: _controllerPassword.text,
+      await authService.signInWithEmailPassword(
+        _controllerEmail.text,
+        _controllerPassword.text,
       );
 
       // Navigasi ke halaman dashboard setelah berhasil login
       context.go('/admin/dashboard');
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        errorMessage = e.message;
-      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Login failed: Email / Password salah')),
+      );
+      print(e);
     }
   }
 
