@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jawara_pintar_kel_5/models/warga_model.dart';
+import 'package:jawara_pintar_kel_5/services/warga_service.dart';
 import 'package:jawara_pintar_kel_5/utils.dart' show getPrimaryColor;
-import 'package:jawara_pintar_kel_5/widget/form/date_picker_field.dart';
-import 'package:jawara_pintar_kel_5/widget/form/labeled_dropdown.dart';
-import 'package:jawara_pintar_kel_5/widget/form/labeled_text_field.dart';
 import 'package:jawara_pintar_kel_5/widget/form/section_card.dart';
+import 'package:jawara_pintar_kel_5/widget/form/labeled_text_field.dart';
+import 'package:jawara_pintar_kel_5/widget/form/labeled_dropdown.dart';
+import 'package:jawara_pintar_kel_5/widget/form/date_picker_field.dart';
 import 'package:jawara_pintar_kel_5/widget/moon_result_modal.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditWargaPage extends StatefulWidget {
-  final Map<String, String> warga;
+  final Warga warga;
   const EditWargaPage({super.key, required this.warga});
 
   @override
@@ -16,34 +19,179 @@ class EditWargaPage extends StatefulWidget {
 }
 
 class _EditWargaPageState extends State<EditWargaPage> {
-  // Controllers: kosongkan agar placeholder menampilkan nilai lama.
-  final _namaCtl = TextEditingController();
-  final _nikCtl = TextEditingController();
-  final _teleponCtl = TextEditingController();
-  final _tempatLahirCtl = TextEditingController();
-  final _tglLahirCtl = TextEditingController();
+  // Service
+  final _wargaService = WargaService();
+  
+  // Controllers
+  late final TextEditingController _namaCtl;
+  late final TextEditingController _idCtl;
+  late final TextEditingController _ttlCtl;
+  late final TextEditingController _tempatLahirCtl;
+  late final TextEditingController _teleponCtl;
+  late final TextEditingController _emailCtl;
 
-  // Dropdown states (biarkan null saat awal supaya hint tampil)
-  String? _jenisKelamin;
+  // Dropdown states
+  Gender? _jenisKelamin;
   String? _agama;
-  String? _golDarah;
-  String? _keluarga;
+  GolonganDarah? _golDarah;
+  String? _keluargaId;
   String? _peranKeluarga;
   String? _statusHidup;
-  String? _statusPenduduk;
+  StatusPenduduk? _statusPenduduk;
   String? _pendidikan;
   String? _pekerjaan;
 
-  String _w(String key, [String fallback = '']) =>
-      widget.warga[key] ?? fallback;
+  // Data dari database
+  List<Keluarga> _keluargaList = [];
+  bool _isLoading = false;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize controllers with existing data
+    _namaCtl = TextEditingController(text: widget.warga.nama);
+    _idCtl = TextEditingController(text: widget.warga.id);
+    _ttlCtl = TextEditingController(text: widget.warga.tanggalLahir?.toString().split(' ')[0] ?? '');
+    _tempatLahirCtl = TextEditingController(text: widget.warga.tempatLahir ?? '');
+    _teleponCtl = TextEditingController(text: widget.warga.telepon ?? '');
+    _emailCtl = TextEditingController(text: widget.warga.email ?? '');
+
+    // Initialize dropdown states with existing data
+    _jenisKelamin = widget.warga.gender;
+    _agama = widget.warga.agama;
+    _golDarah = widget.warga.golDarah;
+    _keluargaId = widget.warga.keluargaId;
+    _statusHidup = widget.warga.statusHidupWafat;
+    _statusPenduduk = widget.warga.statusPenduduk;
+    _pendidikan = widget.warga.pendidikanTerakhir;
+    _pekerjaan = widget.warga.pekerjaan;
+
+    _loadKeluargaData();
+  }
+
+  Future<void> _loadKeluargaData() async {
+    setState(() => _isLoading = true);
+    try {
+      final keluarga = await _wargaService.getAllKeluarga();
+      setState(() {
+        _keluargaList = keluarga;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading keluarga: $e')),
+        );
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _updateWarga() async {
+    // Validasi form
+    if (_idCtl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('NIK tidak boleh kosong')),
+      );
+      return;
+    }
+
+    if (_namaCtl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama tidak boleh kosong')),
+      );
+      return;
+    }
+
+    if (_jenisKelamin == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Jenis kelamin harus dipilih')),
+      );
+      return;
+    }
+
+    if (_statusPenduduk == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Status kependudukan harus dipilih')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      // Parsing tanggal lahir jika ada
+      DateTime? tanggalLahir;
+      if (_ttlCtl.text.isNotEmpty) {
+        try {
+          tanggalLahir = DateTime.parse(_ttlCtl.text);
+        } catch (e) {
+          // Format tanggal tidak valid, skip
+        }
+      }
+
+      // Buat object Warga dengan data yang diupdate
+      final wargaUpdated = Warga(
+        id: _idCtl.text,
+        nama: _namaCtl.text,
+        tanggalLahir: tanggalLahir,
+        tempatLahir: _tempatLahirCtl.text.isEmpty ? null : _tempatLahirCtl.text,
+        telepon: _teleponCtl.text.isEmpty ? null : _teleponCtl.text,
+        gender: _jenisKelamin,
+        golDarah: _golDarah,
+        pendidikanTerakhir: _pendidikan,
+        pekerjaan: _pekerjaan,
+        statusPenduduk: _statusPenduduk,
+        statusHidupWafat: _statusHidup,
+        keluargaId: _keluargaId,
+        agama: _agama,
+        fotoKtp: null,
+        email: _emailCtl.text.isEmpty ? null : _emailCtl.text,
+      );
+
+      // Update ke database menggunakan ID lama
+      await _wargaService.updateWarga(widget.warga.id, wargaUpdated);
+
+      if (mounted) {
+        // Tampilkan success modal
+        await showResultModal(
+          context,
+          type: ResultType.success,
+          title: 'Berhasil',
+          description: 'Data warga berhasil diupdate.',
+          actionLabel: 'Selesai',
+          autoProceed: true,
+        );
+
+        // Kembali ke halaman daftar warga dengan hasil 'true'
+        if (mounted) {
+          context.pop(true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        await showResultModal(
+          context,
+          type: ResultType.error,
+          title: 'Error',
+          description: 'Gagal mengupdate data: $e',
+          actionLabel: 'Coba Lagi',
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
 
   @override
   void dispose() {
     _namaCtl.dispose();
-    _nikCtl.dispose();
-    _teleponCtl.dispose();
+    _idCtl.dispose();
+    _ttlCtl.dispose();
     _tempatLahirCtl.dispose();
-    _tglLahirCtl.dispose();
+    _teleponCtl.dispose();
+    _emailCtl.dispose();
     super.dispose();
   }
 
@@ -68,66 +216,54 @@ class _EditWargaPageState extends State<EditWargaPage> {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
+          // Data Diri
           SectionCard(
             title: 'Data Diri',
             children: [
               LabeledTextField(
                 label: 'Nama Lengkap',
                 controller: _namaCtl,
-                hint: _w('name', 'Nama Lengkap'),
+                hint: 'Masukkan nama lengkap',
               ),
               const SizedBox(height: 8),
               LabeledTextField(
                 label: 'NIK',
-                controller: _nikCtl,
+                controller: _idCtl,
                 keyboardType: TextInputType.number,
-                hint: _w('nik', 'NIK'),
-              ),
-              const SizedBox(height: 8),
-              LabeledTextField(
-                label: 'Nomor Telephone',
-                controller: _teleponCtl,
-                keyboardType: TextInputType.phone,
-                hint: _w('phone', 'Nomor Telephone'),
-              ),
-              const SizedBox(height: 8),
-              LabeledTextField(
-                label: 'Tempat Lahir',
-                controller: _tempatLahirCtl,
-                hint: _w('birthPlace', 'Contoh: Malang'),
+                hint: 'Masukkan NIK',
               ),
               const SizedBox(height: 8),
               DatePickerField(
                 label: 'Tanggal Lahir',
-                controller: _tglLahirCtl,
-                placeholder: _w('birthDate', 'Tanggal Lahir'),
+                controller: _ttlCtl,
+                placeholder: 'Pilih Tanggal',
               ),
             ],
           ),
 
+          // Atribut Personal
           SectionCard(
             title: 'Atribut Personal',
             children: [
-              LabeledDropdown<String>(
+              LabeledDropdown<Gender>(
                 label: 'Jenis Kelamin',
                 value: _jenisKelamin,
-                hint: _w('gender', 'Pilih Jenis Kelamin'),
                 onChanged: (v) => setState(() => _jenisKelamin = v),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'Laki-laki',
-                    child: Text('Laki-laki'),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('-- Pilih --'),
                   ),
-                  DropdownMenuItem(
-                    value: 'Perempuan',
-                    child: Text('Perempuan'),
-                  ),
+                  ...Gender.values.map((gender) =>
+                      DropdownMenuItem(
+                        value: gender,
+                        child: Text(gender.value),
+                      )),
                 ],
               ),
               LabeledDropdown<String>(
                 label: 'Agama',
                 value: _agama,
-                hint: _w('religion', 'Pilih Agama'),
                 onChanged: (v) => setState(() => _agama = v),
                 items: const [
                   DropdownMenuItem(value: 'Islam', child: Text('Islam')),
@@ -138,44 +274,49 @@ class _EditWargaPageState extends State<EditWargaPage> {
                   DropdownMenuItem(value: 'Konghucu', child: Text('Konghucu')),
                 ],
               ),
-              LabeledDropdown<String>(
+              LabeledDropdown<GolonganDarah>(
                 label: 'Golongan Darah',
                 value: _golDarah,
-                hint: _w('blood', 'Pilih Golongan Darah'),
                 onChanged: (v) => setState(() => _golDarah = v),
-                items: const [
-                  DropdownMenuItem(value: 'A', child: Text('A')),
-                  DropdownMenuItem(value: 'B', child: Text('B')),
-                  DropdownMenuItem(value: 'AB', child: Text('AB')),
-                  DropdownMenuItem(value: 'O', child: Text('O')),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('-- Pilih --'),
+                  ),
+                  ...GolonganDarah.values.map((gol) =>
+                      DropdownMenuItem(
+                        value: gol,
+                        child: Text(gol.value),
+                      )),
                 ],
               ),
             ],
           ),
 
+          // Status & Peran
           SectionCard(
             title: 'Status & Peran',
             children: [
               LabeledDropdown<String>(
                 label: 'Keluarga',
-                value: _keluarga,
-                hint: _w('family', 'Pilih Keluarga'),
-                onChanged: (v) => setState(() => _keluarga = v),
-                items: const [
+                value: _keluargaId,
+                onChanged: (v) => setState(() => _keluargaId = v),
+                items: [
                   DropdownMenuItem(
-                    value: 'Keluarga Besar Mojokerto',
-                    child: Text('Keluarga Besar Mojokerto'),
+                    value: null,
+                    child: Text(_isLoading ? 'Loading...' : '-- Pilih Keluarga --'),
                   ),
-                  DropdownMenuItem(
-                    value: 'Keluarga Besar Blitar',
-                    child: Text('Keluarga Besar Blitar'),
-                  ),
+                  if (!_isLoading)
+                    ..._keluargaList.map((keluarga) =>
+                        DropdownMenuItem(
+                          value: keluarga.id,
+                          child: Text(keluarga.namaKeluarga),
+                        )),
                 ],
               ),
               LabeledDropdown<String>(
                 label: 'Peran',
                 value: _peranKeluarga,
-                hint: _w('role', 'Pilih Peran dalam keluarga'),
                 onChanged: (v) => setState(() => _peranKeluarga = v),
                 items: const [
                   DropdownMenuItem(
@@ -189,33 +330,38 @@ class _EditWargaPageState extends State<EditWargaPage> {
               LabeledDropdown<String>(
                 label: 'Status Hidup',
                 value: _statusHidup,
-                hint: _w('lifeStatus', 'Pilih Status Hidup'),
                 onChanged: (v) => setState(() => _statusHidup = v),
                 items: const [
                   DropdownMenuItem(value: 'Hidup', child: Text('Hidup')),
                   DropdownMenuItem(value: 'Wafat', child: Text('Wafat')),
                 ],
               ),
-              LabeledDropdown<String>(
+              LabeledDropdown<StatusPenduduk>(
                 label: 'Status Kependudukan',
                 value: _statusPenduduk,
-                hint: _w('status', 'Pilih Status Penduduk'),
                 onChanged: (v) => setState(() => _statusPenduduk = v),
-                items: const [
-                  DropdownMenuItem(value: 'Aktif', child: Text('Aktif')),
-                  DropdownMenuItem(value: 'Nonaktif', child: Text('Nonaktif')),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('-- Pilih --'),
+                  ),
+                  ...StatusPenduduk.values.map((status) =>
+                      DropdownMenuItem(
+                        value: status,
+                        child: Text(status.value),
+                      )),
                 ],
               ),
             ],
           ),
 
+          // Latar Belakang
           SectionCard(
             title: 'Latar Belakang',
             children: [
               LabeledDropdown<String>(
                 label: 'Pendidikan Terakhir',
                 value: _pendidikan,
-                hint: _w('education', 'Pilih Pendidikan Terakhir'),
                 onChanged: (v) => setState(() => _pendidikan = v),
                 items: const [
                   DropdownMenuItem(value: 'SD', child: Text('SD')),
@@ -230,7 +376,6 @@ class _EditWargaPageState extends State<EditWargaPage> {
               LabeledDropdown<String>(
                 label: 'Pekerjaan',
                 value: _pekerjaan,
-                hint: _w('job', 'Pilih Pekerjaan'),
                 onChanged: (v) => setState(() => _pekerjaan = v),
                 items: const [
                   DropdownMenuItem(
@@ -269,20 +414,18 @@ class _EditWargaPageState extends State<EditWargaPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: () async {
-                  // TODO: Simpan perubahan
-                  await showResultModal(
-                    context,
-                    type: ResultType.success,
-                    title: 'Berhasil',
-                    description: 'Perubahan data warga berhasil disimpan.',
-                    actionLabel: 'Selesai',
-                    autoProceed: true,
-                  );
-                  // Kembali ke halaman detail warga
-                  if (context.mounted) context.pop();
-                },
-                child: const Text('Simpan Perubahan'),
+                onPressed: _isSaving ? null : () => _updateWarga(),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text('Simpan Perubahan'),
               ),
             ),
           ),

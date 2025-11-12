@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jawara_pintar_kel_5/models/warga_model.dart';
+import 'package:jawara_pintar_kel_5/services/warga_service.dart';
 import 'package:jawara_pintar_kel_5/widget/moon_result_modal.dart';
 import 'package:moon_design/moon_design.dart';
+import 'package:intl/intl.dart';
 
 class DetailWargaPage extends StatelessWidget {
-  final Map<String, String> warga;
+  final Warga warga;
   const DetailWargaPage({super.key, required this.warga});
 
   @override
   Widget build(BuildContext context) {
-    final name = warga['name'] ?? '-';
-    final nik = warga['nik'] ?? '-';
-    final keluarga = warga['family'] ?? '-';
-    final status = warga['status'] ?? 'Aktif';
-
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
@@ -31,35 +29,10 @@ class DetailWargaPage extends StatelessWidget {
         ),
         actions: [
           _MoreMenu(
-            wargaName: name,
-            onEdit: () {
-              context.pushNamed('wargaEdit', extra: warga);
-            },
-            onDeleteConfirmed: () async {
-              final confirmed = await _showDeleteConfirmationDialog(
-                context: context,
-                title: 'Hapus Data Warga?',
-                message:
-                    'Apakah Anda yakin ingin menghapus data "$name"? Data yang sudah dihapus tidak dapat dikembalikan.',
-              );
-              if (confirmed == true) {
-                // TODO: Panggil service penghapusan data di sini
-                await showResultModal(
-                  context,
-                  type: ResultType.success,
-                  title: 'Berhasil',
-                  description: 'Data "$name" telah dihapus.',
-                  actionLabel: 'Selesai',
-                  autoProceed: true,
-                );
-                // Kembali ke halaman daftar warga
-                if (context.mounted) Navigator.of(context).pop();
-              }
-            },
+            warga: warga,
           ),
         ],
       ),
-
       body: Container(
         color: const Color(0xFFF7F7FB),
         child: ListView(
@@ -82,6 +55,11 @@ class DetailWargaPage extends StatelessWidget {
                       color: Color.fromRGBO(0, 0, 0, 0.08),
                       shape: BoxShape.circle,
                     ),
+                    child: Icon(
+                      warga.gender == Gender.lakilaki ? Icons.male : Icons.female,
+                      size: 40,
+                      color: Colors.grey,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -89,7 +67,7 @@ class DetailWargaPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          name,
+                          warga.nama,
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -97,7 +75,7 @@ class DetailWargaPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'NIK :  $nik',
+                          'NIK :  ${warga.id}',
                           style: const TextStyle(color: Colors.black87),
                         ),
                       ],
@@ -111,26 +89,27 @@ class DetailWargaPage extends StatelessWidget {
 
             _SectionCard(
               title: 'Data Diri',
-              children: const [
+              children: [
                 _IconTextRow(
                   icon: Icons.event,
                   title: 'Tempat, Tanggal Lahir:',
-                  value: 'Mojokerto, 11 Januari 2004',
+                  value:
+                      '${warga.tempatLahir ?? '-'}, ${warga.tanggalLahir != null ? DateFormat('d MMMM yyyy').format(warga.tanggalLahir!) : '-'}',
                 ),
                 _IconTextRow(
                   icon: Icons.people,
                   title: 'Jenis Kelamin:',
-                  value: 'Laki - Laki',
+                  value: warga.gender?.value ?? '-',
                 ),
                 _IconTextRow(
                   icon: Icons.self_improvement,
                   title: 'Agama:',
-                  value: 'Islam',
+                  value: warga.agama ?? '-',
                 ),
                 _IconTextRow(
                   icon: Icons.bloodtype,
                   title: 'Golongan Darah:',
-                  value: 'O',
+                  value: warga.golDarah?.value ?? '-',
                 ),
               ],
             ),
@@ -143,40 +122,45 @@ class DetailWargaPage extends StatelessWidget {
                 _IconTextRow(
                   icon: Icons.groups_2,
                   title: 'Keluarga:',
-                  value: keluarga,
+                  value: warga.keluarga?.namaKeluarga ?? '-',
                 ),
                 const _IconTextRow(
                   icon: Icons.badge,
                   title: 'Peran Dalam Keluarga:',
-                  value: 'Anak',
+                  value: 'Anak', // Note: This data is not in the model
                 ),
                 _IconTextRow(
                   icon: Icons.verified,
                   title: 'Status Kependudukan:',
-                  value: status,
+                  value: warga.statusPenduduk?.value ?? '-',
                 ),
               ],
             ),
 
             const SizedBox(height: 16),
 
-            const _SectionCard(
+            _SectionCard(
               title: 'Informasi Tambahan',
               children: [
                 _IconTextRow(
                   icon: Icons.school,
                   title: 'Pendidikan Terakhir:',
-                  value: 'Sekolah Menengah Atas',
+                  value: warga.pendidikanTerakhir ?? '-',
                 ),
                 _IconTextRow(
                   icon: Icons.work_outline,
                   title: 'Pekerjaan:',
-                  value: 'Data Engineer',
+                  value: warga.pekerjaan ?? '-',
                 ),
                 _IconTextRow(
                   icon: Icons.phone,
                   title: 'Nomor Telephone:',
-                  value: '081234567890',
+                  value: warga.telepon ?? '-',
+                ),
+                _IconTextRow(
+                  icon: Icons.email,
+                  title: 'Email:',
+                  value: warga.email ?? '-',
                 ),
               ],
             ),
@@ -190,14 +174,10 @@ class DetailWargaPage extends StatelessWidget {
 // ========================= More Menu & Dialog =========================
 
 class _MoreMenu extends StatelessWidget {
-  final String wargaName;
-  final VoidCallback onEdit;
-  final Future<void> Function() onDeleteConfirmed;
+  final Warga warga;
 
   const _MoreMenu({
-    required this.wargaName,
-    required this.onEdit,
-    required this.onDeleteConfirmed,
+    required this.warga,
   });
 
   void _showOptionsBottomSheet(BuildContext context) {
@@ -214,7 +194,6 @@ class _MoreMenu extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Handle bar
                 Center(
                   child: Container(
                     width: 40,
@@ -226,14 +205,12 @@ class _MoreMenu extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                // Title
                 const Text(
                   'Opsi',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 16),
                 const Divider(height: 1),
-                // Edit option
                 ListTile(
                   leading: Container(
                     width: 40,
@@ -255,11 +232,10 @@ class _MoreMenu extends StatelessWidget {
                   subtitle: const Text('Ubah data warga'),
                   onTap: () {
                     Navigator.pop(context);
-                    onEdit();
+                    context.pushNamed('wargaEdit', extra: warga);
                   },
                 ),
                 const Divider(height: 1),
-                // Delete option
                 ListTile(
                   leading: Container(
                     width: 40,
@@ -284,7 +260,39 @@ class _MoreMenu extends StatelessWidget {
                   subtitle: const Text('Hapus data warga secara permanen'),
                   onTap: () async {
                     Navigator.pop(context);
-                    await onDeleteConfirmed();
+                    final confirmed = await _showDeleteConfirmationDialog(
+                      context: context,
+                      title: 'Hapus Data Warga?',
+                      message:
+                          'Apakah Anda yakin ingin menghapus data "${warga.nama}"? Data yang sudah dihapus tidak dapat dikembalikan.',
+                    );
+                    if (confirmed == true) {
+                      try {
+                        await WargaService().deleteWarga(warga.id);
+                        if (context.mounted) {
+                           await showResultModal(
+                            context,
+                            type: ResultType.success,
+                            title: 'Berhasil',
+                            description: 'Data "${warga.nama}" telah dihapus.',
+                            actionLabel: 'Selesai',
+                            autoProceed: true,
+                          );
+                          // Kembali ke halaman daftar warga
+                          context.pop(true); // Kirim 'true' untuk refresh
+                        }
+                      } catch (e) {
+                         if (context.mounted) {
+                           showResultModal(
+                            context,
+                            type: ResultType.error,
+                            title: 'Gagal',
+                            description: 'Gagal menghapus data: $e',
+                            actionLabel: 'Tutup',
+                          );
+                        }
+                      }
+                    }
                   },
                 ),
                 const SizedBox(height: 8),

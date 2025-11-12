@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jawara_pintar_kel_5/models/warga_model.dart';
+import 'package:jawara_pintar_kel_5/services/warga_service.dart';
 import 'package:jawara_pintar_kel_5/utils.dart' show getPrimaryColor;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DaftarWargaPage extends StatefulWidget {
   const DaftarWargaPage({super.key});
@@ -12,25 +15,20 @@ class DaftarWargaPage extends StatefulWidget {
 class _DaftarWargaPageState extends State<DaftarWargaPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final WargaService _wargaService = WargaService();
+  
   String _query = '';
-  String? _filterGender;
-  String? _filterStatus;
+  Gender? _filterGender;
+  StatusPenduduk? _filterStatus;
   String? _filterFamily;
   String? _filterLife;
-
-  final List<Map<String, String>> _items = List.generate(8, (i) {
-    return {
-      'name': i % 2 == 0 ? 'Muhamad Rifda Musyaffa\'' : 'Gamers Sejati 18xX',
-      'nik': (2300000000 + i).toString(),
-      'family': ['Keluarga Besar Mojokerto', 'Keluarga Besar Blitar'][i % 2],
-      'status': i % 3 == 0 ? 'Aktif' : 'Nonaktif',
-      'life': i % 2 == 0 ? 'Hidup' : 'Wafat',
-    };
-  });
+  
+  List<Warga> _allWarga = [];
+  List<Keluarga> _allKeluarga = [];
 
   void _openFilter() {
-    String? tempGender = _filterGender;
-    String? tempStatus = _filterStatus;
+    Gender? tempGender = _filterGender;
+    StatusPenduduk? tempStatus = _filterStatus;
     String? tempFamily = _filterFamily;
     String? tempLife = _filterLife;
 
@@ -79,19 +77,20 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
+                      DropdownButtonFormField<Gender>(
                         initialValue: tempGender,
                         isExpanded: true,
                         decoration: _dropdownDecoration(),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'Laki-laki',
-                            child: Text('Laki-laki'),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('-- Semua --'),
                           ),
-                          DropdownMenuItem(
-                            value: 'Perempuan',
-                            child: Text('Perempuan'),
-                          ),
+                          ...Gender.values.map((gender) =>
+                              DropdownMenuItem(
+                                value: gender,
+                                child: Text(gender.value),
+                              )),
                         ],
                         onChanged: (v) => setModalState(() => tempGender = v),
                       ),
@@ -101,19 +100,20 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
+                      DropdownButtonFormField<StatusPenduduk>(
                         initialValue: tempStatus,
                         isExpanded: true,
                         decoration: _dropdownDecoration(),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'Aktif',
-                            child: Text('Aktif'),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('-- Semua --'),
                           ),
-                          DropdownMenuItem(
-                            value: 'Nonaktif',
-                            child: Text('Nonaktif'),
-                          ),
+                          ...StatusPenduduk.values.map((status) =>
+                              DropdownMenuItem(
+                                value: status,
+                                child: Text(status.value),
+                              )),
                         ],
                         onChanged: (v) => setModalState(() => tempStatus = v),
                       ),
@@ -127,15 +127,16 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                         initialValue: tempFamily,
                         isExpanded: true,
                         decoration: _dropdownDecoration(),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'Keluarga Besar Mojokerto',
-                            child: Text('Keluarga Besar Mojokerto'),
+                        items: [
+                          const DropdownMenuItem(
+                            value: null,
+                            child: Text('-- Semua Keluarga --'),
                           ),
-                          DropdownMenuItem(
-                            value: 'Keluarga Besar Blitar',
-                            child: Text('Keluarga Besar Blitar'),
-                          ),
+                          ..._allKeluarga.map((keluarga) =>
+                              DropdownMenuItem(
+                                value: keluarga.namaKeluarga,
+                                child: Text(keluarga.namaKeluarga),
+                              )),
                         ],
                         onChanged: (v) => setModalState(() => tempFamily = v),
                       ),
@@ -253,26 +254,125 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
     );
   }
 
-  List<Map<String, String>> get _filtered {
-    return _items.where((e) {
+  List<Warga> get _filtered {
+    return _allWarga.where((warga) {
       // Filter berdasarkan search query
       final matchesQuery = _query.isEmpty ||
-          e['name']!.toLowerCase().contains(_query.toLowerCase()) ||
-          e['nik']!.contains(_query);
+          warga.nama.toLowerCase().contains(_query.toLowerCase()) ||
+          warga.id.contains(_query);
 
-      // Filter berdasarkan status
+      // Filter berdasarkan gender
+      final matchesGender =
+          _filterGender == null || warga.gender == _filterGender;
+
+      // Filter berdasarkan status penduduk
       final matchesStatus =
-          _filterStatus == null || e['status'] == _filterStatus;
+          _filterStatus == null || warga.statusPenduduk == _filterStatus;
 
       // Filter berdasarkan keluarga
-      final matchesFamily =
-          _filterFamily == null || e['family'] == _filterFamily;
+      final matchesFamily = _filterFamily == null ||
+          warga.keluarga?.namaKeluarga == _filterFamily;
 
       // Filter berdasarkan status hidup/wafat
-      final matchesLife = _filterLife == null || e['life'] == _filterLife;
+      final matchesLife =
+          _filterLife == null || warga.statusHidupWafat == _filterLife;
 
-      return matchesQuery && matchesStatus && matchesFamily && matchesLife;
+      return matchesQuery &&
+          matchesGender &&
+          matchesStatus &&
+          matchesFamily &&
+          matchesLife;
     }).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWargaData();
+  }
+
+  Future<void> _loadWargaData() async {
+    // -- TAMBAHKAN PRINT UNTUK DEBUGGING --
+    debugPrint("Mencoba memuat data warga. Status login: ${Supabase.instance.client.auth.currentUser?.email ?? 'Tidak Login'}");
+    // ------------------------------------
+    try {
+      final warga = await _wargaService.getAllWarga();
+      final keluarga = await _wargaService.getAllKeluarga();
+      
+      setState(() {
+        _allWarga = warga;
+        _allKeluarga = keluarga;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading data: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _navigateToEdit(Warga warga) async {
+    final result = await context.pushNamed('wargaEdit', extra: warga);
+    // Jika halaman edit mengembalikan nilai 'true', muat ulang data
+    if (result == true && mounted) {
+      _loadWargaData();
+    }
+  }
+
+  Future<void> _navigateToAdd() async {
+    final result = await context.pushNamed('wargaAdd');
+    // Jika halaman tambah mengembalikan nilai 'true', muat ulang data
+    if (result == true && mounted) {
+      _loadWargaData();
+    }
+  }
+
+  void _showDeleteConfirmation(BuildContext context, Warga warga) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus Warga'),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus ${warga.nama} (${warga.id})?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteWarga(warga.id);
+            },
+            child: const Text('Hapus', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteWarga(String nik) async {
+    try {
+      await _wargaService.deleteWarga(nik);
+      
+      if (mounted) {
+        setState(() {
+          _allWarga.removeWhere((w) => w.id == nik);
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Data warga berhasil dihapus')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting warga: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -322,10 +422,10 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
                   itemBuilder: (context, index) {
                     final item = _filtered[index];
                     return _WargaCard(
-                      item: item,
+                      warga: item,
                       primary: getPrimaryColor(context),
-                      onTap: () =>
-                          context.pushNamed('wargaDetail', extra: item),
+                      onTap: () => _navigateToEdit(item),
+                      onDelete: () => _showDeleteConfirmation(context, item),
                     );
                   },
                 ),
@@ -336,7 +436,7 @@ class _DaftarWargaPageState extends State<DaftarWargaPage> {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: getPrimaryColor(context),
-        onPressed: () => context.pushNamed('wargaAdd'),
+        onPressed: _navigateToAdd,
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
@@ -415,11 +515,19 @@ class _SearchFilterBar extends StatelessWidget {
 }
 
 class _WargaCard extends StatelessWidget {
-  final Map<String, String> item;
+  final Warga warga;
   final Color primary;
   final VoidCallback? onTap;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
-  const _WargaCard({required this.item, required this.primary, this.onTap});
+  const _WargaCard({
+    required this.warga,
+    required this.primary,
+    this.onTap,
+    this.onEdit,
+    this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -446,7 +554,7 @@ class _WargaCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item['name'] ?? '-',
+                        warga.nama,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -456,7 +564,7 @@ class _WargaCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'NIK : ${item['nik']}',
+                        'NIK : ${warga.id}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: Colors.black87),
@@ -466,7 +574,7 @@ class _WargaCard extends StatelessWidget {
                         builder: (context) {
                           final c = Colors.black;
                           return Text(
-                            'Keluarga : ${item['family']}',
+                            'Keluarga : ${warga.keluarga?.namaKeluarga ?? '-'}',
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(color: c.withValues(alpha: 0.8)),
@@ -478,22 +586,56 @@ class _WargaCard extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          _StatusChip(status: item['status'] ?? 'Nonaktif'),
-                          _LifeChip(life: item['life'] ?? 'Hidup'),
+                          if (warga.statusPenduduk != null)
+                            _StatusChip(status: warga.statusPenduduk!),
+                          if (warga.gender != null)
+                            _GenderChip(gender: warga.gender!),
                         ],
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color.fromRGBO(78, 70, 180, 0.08),
-                    shape: BoxShape.circle,
+                PopupMenuButton<String>(
+                  position: PopupMenuPosition.under,
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 20),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Hapus', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      onEdit?.call();
+                    } else if (value == 'delete') {
+                      onDelete?.call();
+                    }
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(78, 70, 180, 0.08),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.more_vert, color: primary),
                   ),
-                  child: Icon(Icons.chevron_right, color: primary),
                 ),
               ],
             ),
@@ -505,20 +647,21 @@ class _WargaCard extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  final String status;
+  final StatusPenduduk status;
   const _StatusChip({required this.status});
 
   @override
   Widget build(BuildContext context) {
     Color bg;
     Color text = Colors.white;
-    switch (status.toLowerCase()) {
-      case 'aktif':
+    switch (status) {
+      case StatusPenduduk.aktif:
         bg = const Color(0xFF4E46B4); // Primary color
         break;
-      default:
+      case StatusPenduduk.nonaktif:
         bg = Colors.grey.shade300;
         text = Colors.black87;
+        break;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -532,7 +675,7 @@ class _StatusChip extends StatelessWidget {
           Icon(Icons.map, size: 14, color: text),
           const SizedBox(width: 6),
           Text(
-            status,
+            status.value,
             style: TextStyle(
               color: text,
               fontSize: 12,
@@ -545,21 +688,21 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-class _LifeChip extends StatelessWidget {
-  final String life;
-  const _LifeChip({required this.life});
+class _GenderChip extends StatelessWidget {
+  final Gender gender;
+  const _GenderChip({required this.gender});
 
   @override
   Widget build(BuildContext context) {
     Color bg;
     Color text = Colors.white;
-    switch (life.toLowerCase()) {
-      case 'hidup':
+    switch (gender) {
+      case Gender.lakilaki:
         bg = const Color(0xFF4E46B4); // Primary color
         break;
-      default:
-        bg = Colors.grey.shade300;
-        text = Colors.black87;
+      case Gender.perempuan:
+        bg = Colors.pink.shade400;
+        break;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -570,10 +713,14 @@ class _LifeChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.person, size: 14, color: text),
+          Icon(
+            gender == Gender.lakilaki ? Icons.male : Icons.female,
+            size: 14,
+            color: text,
+          ),
           const SizedBox(width: 6),
           Text(
-            life,
+            gender.value,
             style: TextStyle(
               color: text,
               fontSize: 12,
@@ -585,3 +732,4 @@ class _LifeChip extends StatelessWidget {
     );
   }
 }
+

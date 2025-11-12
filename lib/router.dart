@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jawara_pintar_kel_5/models/warga_model.dart' as warga_model;
 import 'package:jawara_pintar_kel_5/screens/admin/dashboard/dashboard.dart';
 import 'package:jawara_pintar_kel_5/screens/admin/keuangan/keuangan_menu_screen.dart';
 import 'package:jawara_pintar_kel_5/screens/admin/keuangan/laporan_keuangan_screen.dart';
@@ -138,8 +139,8 @@ final router = GoRouter(
                   path: 'detail-warga',
                   name: 'wargaDetail',
                   builder: (context, state) {
-                    final data = state.extra as Map<String, String>? ?? {};
-                    return DetailWargaPage(warga: data);
+                    final warga = state.extra as warga_model.Warga;
+                    return DetailWargaPage(warga: warga);
                   },
                 ),
                 GoRoute(
@@ -151,8 +152,8 @@ final router = GoRouter(
                   path: 'edit-warga',
                   name: 'wargaEdit',
                   builder: (context, state) {
-                    final data = state.extra as Map<String, String>? ?? {};
-                    return EditWargaPage(warga: data);
+                    final warga = state.extra as warga_model.Warga;
+                    return EditWargaPage(warga: warga);
                   },
                 ),
                 GoRoute(

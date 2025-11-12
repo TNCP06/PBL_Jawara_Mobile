@@ -1,0 +1,54 @@
+// SOLUSI ERROR: "could not embed because more than one relationship was found"
+// ==========================================================================
+
+// MASALAH:
+// ========
+// Error terjadi saat fetch data warga dengan query:
+// .select('*, keluarga(*), anggota_keluarga(*)')
+//
+// Penyebab: Ada multiple relationships antara tabel 'warga' dan 'keluarga'
+// - keluarga_id di tabel warga (warga -> keluarga)
+// - kepala_keluarga_id di tabel keluarga (keluarga -> warga)
+// Supabase tidak bisa otomatis menentukan foreign key mana yang dipakai.
+
+// SOLUSI:
+// =======
+// Gunakan explicit relationship aliasing dengan format:
+// keluarga:keluarga_id(kolom1, kolom2, ...)
+//
+// Ini menandakan:
+// - 'keluarga' = alias/nama relasi
+// - 'keluarga_id' = foreign key yang dipakai
+// - (kolom...) = kolom yang di-fetch dari tabel keluarga
+
+// CONTOH QUERY YANG DIPERBAIKI:
+// =============================
+
+// SEBELUM (Error):
+.select('*, keluarga(*), anggota_keluarga(*)')
+
+// SESUDAH (Bekerja):
+.select('''
+  nik, nama, tanggal_lahir, tempat_lahir, telepon, gender, 
+  gol_darah, pendidikan_terakhir, pekerjaan, status_penduduk, 
+  status_hidup_wafat, keluarga_id, agama_id, foto_ktp, email,
+  keluarga:keluarga_id(id, nama_keluarga, kepala_keluarga_id, alamat_rumah, status_kepemilikan, status_keluarga)
+''')
+
+// KEUNTUNGAN PENDEKATAN BARU:
+// ===========================
+// 1. ✓ Mengatasi ambiguous relationship error
+// 2. ✓ Lebih explicit dan clear tentang relasi yang dipakai
+// 3. ✓ Hanya fetch kolom yang benar-benar dibutuhkan (lebih efisien)
+// 4. ✓ Tidak fetch anggota_keluarga (tidak diperlukan di halaman daftar)
+// 5. ✓ Response size lebih kecil
+
+// FILE YANG SUDAH DIPERBAIKI:
+// ============================
+// lib/services/warga_service.dart:
+// - getAllWarga()
+// - getWargaByNik()
+// - getWargaByKeluargaId()
+// - getWargaFiltered()
+// - createWarga()
+// - updateWarga()

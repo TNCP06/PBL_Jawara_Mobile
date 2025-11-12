@@ -1,0 +1,102 @@
+// PANDUAN INTEGRASI SUPABASE UNTUK HALAMAN DAFTAR WARGA
+// ========================================================
+
+// STRUKTUR DATABASE YANG DIHARAPKAN:
+
+// 1. Tabel: warga
+// ================
+// Kolom: 
+//   - nik (TEXT, PRIMARY KEY) - Nomor Identitas
+//   - nama (TEXT) - Nama lengkap
+//   - tanggal_lahir (DATE) - Tanggal lahir
+//   - tempat_lahir (TEXT) - Tempat lahir
+//   - telepon (TEXT) - Nomor telepon
+//   - gender (ENUM: 'Pria', 'Perempuan') - Jenis kelamin
+//   - gol_darah (ENUM: 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-') - Golongan darah
+//   - pendidikan_terakhir (TEXT) - Pendidikan terakhir
+//   - pekerjaan (TEXT) - Pekerjaan
+//   - status_penduduk (ENUM: 'Aktif', 'Nonaktif') - Status kependudukan
+//   - status_hidup_wafat (TEXT) - 'Hidup' atau 'Wafat'
+//   - keluarga_id (TEXT, FOREIGN KEY) - ID keluarga (reference ke tabel keluarga)
+//   - agama_id (TEXT) - ID agama
+//   - foto_ktp (TEXT) - URL foto KTP
+//   - email (TEXT) - Email
+
+// 2. Tabel: keluarga
+// ==================
+// Kolom:
+//   - id (TEXT, PRIMARY KEY) - ID unik keluarga
+//   - nama_keluarga (TEXT) - Nama keluarga
+//   - kepala_keluarga_id (TEXT, FOREIGN KEY) - NIK kepala keluarga (reference ke warga.nik)
+//   - alamat_rumah (TEXT) - Alamat rumah
+//   - status_kepemilikan (TEXT) - Status kepemilikan rumah
+//   - status_keluarga (TEXT) - Status keluarga
+
+// 3. Tabel: anggota_keluarga
+// ==========================
+// Kolom:
+//   - id (TEXT, PRIMARY KEY) - ID unik anggota keluarga
+//   - keluarga_id (TEXT, FOREIGN KEY) - ID keluarga (reference ke keluarga.id)
+//   - warga_id (TEXT, FOREIGN KEY) - NIK warga (reference ke warga.nik)
+//   - peran (TEXT) - Peran dalam keluarga (e.g., 'Kepala Keluarga', 'Istri', 'Anak', dll)
+
+// ENUMS YANG DIGUNAKAN:
+// ====================
+// 1. Gender
+//    - Pria
+//    - Perempuan
+//
+// 2. GolonganDarah
+//    - A+
+//    - A-
+//    - B+
+//    - B-
+//    - AB+
+//    - AB-
+//    - O+
+//    - O-
+//
+// 3. StatusPenduduk
+//    - Aktif
+//    - Nonaktif
+
+// FITUR YANG SUDAH TERINTEGRASI:
+// ==============================
+// ✓ Fetch data warga dari database Supabase
+// ✓ Enum support untuk Gender, GolonganDarah, dan StatusPenduduk
+// ✓ Filter berdasarkan:
+//   - Nama atau NIK (search)
+//   - Gender (Pria / Perempuan)
+//   - Status Penduduk (Aktif / Nonaktif)
+//   - Keluarga (dinamis dari database)
+//   - Status Hidup/Wafat (Hidup / Wafat)
+// ✓ Menampilkan nama keluarga setiap warga
+// ✓ Menampilkan badge untuk gender dan status penduduk
+
+// STRUKTUR FILE:
+// ==============
+// - lib/models/warga_model.dart → Model Warga, Keluarga, AnggotaKeluarga + ENUMS
+// - lib/services/warga_service.dart → Service untuk komunikasi dengan Supabase
+// - lib/screens/admin/penduduk/warga/daftar_warga.dart → UI halaman daftar warga
+
+// CATATAN PENTING:
+// ================
+// 1. Pastikan kolom 'status_hidup_wafat' sudah ada di tabel warga
+//    Jika menggunakan field lain, update mapping di Warga.fromJson()
+// 
+// 2. Dropdown keluarga sekarang mengambil data dari tabel keluarga secara dinamis
+//    Tidak ada hardcoded value lagi
+//
+// 3. Jika ada perubahan struktur database, update:
+//    - Field di class Warga/Keluarga/AnggotaKeluarga
+//    - Method fromJson() dan toJson()
+//    - Query di WargaService
+
+// TESTING:
+// ========
+// 1. Pastikan Supabase sudah terhubung dengan benar (lihat main.dart)
+// 2. Buka halaman Daftar Warga
+// 3. Verifikasi data warga muncul dari database
+// 4. Test semua filter untuk memastikan berfungsi dengan baik
+// 5. Test search dengan nama dan NIK
+

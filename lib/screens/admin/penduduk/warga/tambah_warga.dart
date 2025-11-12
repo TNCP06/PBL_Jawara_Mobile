@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:jawara_pintar_kel_5/models/warga_model.dart';
+import 'package:jawara_pintar_kel_5/services/warga_service.dart';
 import 'package:jawara_pintar_kel_5/utils.dart' show getPrimaryColor;
 import 'package:jawara_pintar_kel_5/widget/form/section_card.dart';
 import 'package:jawara_pintar_kel_5/widget/form/labeled_text_field.dart';
 import 'package:jawara_pintar_kel_5/widget/form/labeled_dropdown.dart';
 import 'package:jawara_pintar_kel_5/widget/form/date_picker_field.dart';
 import 'package:jawara_pintar_kel_5/widget/moon_result_modal.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TambahWargaPage extends StatefulWidget {
   const TambahWargaPage({super.key});
@@ -15,27 +18,159 @@ class TambahWargaPage extends StatefulWidget {
 }
 
 class _TambahWargaPageState extends State<TambahWargaPage> {
+  // Service
+  final _wargaService = WargaService();
+  
   // Controllers
   final _namaCtl = TextEditingController();
-  final _nikCtl = TextEditingController();
+  final _idCtl = TextEditingController();
   final _ttlCtl = TextEditingController();
+  final _tempatLahirCtl = TextEditingController();
+  final _teleponCtl = TextEditingController();
+  final _emailCtl = TextEditingController();
 
   // Dropdown states
-  String? _jenisKelamin;
+  Gender? _jenisKelamin;
   String? _agama;
-  String? _golDarah;
-  String? _keluarga;
+  GolonganDarah? _golDarah;
+  String? _keluargaId;
   String? _peranKeluarga;
   String? _statusHidup;
-  String? _statusPenduduk;
+  StatusPenduduk? _statusPenduduk;
   String? _pendidikan;
   String? _pekerjaan;
+
+  // Data dari database
+  List<Keluarga> _keluargaList = [];
+  bool _isLoading = false;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadKeluargaData();
+  }
+
+  Future<void> _loadKeluargaData() async {
+    setState(() => _isLoading = true);
+    try {
+      final keluarga = await _wargaService.getAllKeluarga();
+      setState(() {
+        _keluargaList = keluarga;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading keluarga: $e')),
+        );
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _saveWarga() async {
+    // Validasi form
+    if (_idCtl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('NIK tidak boleh kosong')),
+      );
+      return;
+    }
+
+    if (_namaCtl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama tidak boleh kosong')),
+      );
+      return;
+    }
+
+    if (_jenisKelamin == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Jenis kelamin harus dipilih')),
+      );
+      return;
+    }
+
+    if (_statusPenduduk == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Status kependudukan harus dipilih')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      // Parsing tanggal lahir jika ada
+      DateTime? tanggalLahir;
+      if (_ttlCtl.text.isNotEmpty) {
+        try {
+          tanggalLahir = DateTime.parse(_ttlCtl.text);
+        } catch (e) {
+          // Format tanggal tidak valid, skip
+        }
+      }
+
+      // Buat object Warga
+      final warga = Warga(
+        id: _idCtl.text,
+        nama: _namaCtl.text,
+        tanggalLahir: tanggalLahir,
+        tempatLahir: _tempatLahirCtl.text.isEmpty ? null : _tempatLahirCtl.text,
+        telepon: _teleponCtl.text.isEmpty ? null : _teleponCtl.text,
+        gender: _jenisKelamin,
+        golDarah: _golDarah,
+        pendidikanTerakhir: _pendidikan,
+        pekerjaan: _pekerjaan,
+        statusPenduduk: _statusPenduduk,
+        statusHidupWafat: _statusHidup,
+        keluargaId: _keluargaId,
+        agama: _agama,
+        fotoKtp: null,
+        email: _emailCtl.text.isEmpty ? null : _emailCtl.text,
+      );
+
+      // Simpan ke database
+      await _wargaService.createWarga(warga);
+
+      if (mounted) {
+        // Tampilkan success modal
+        await showResultModal(
+          context,
+          type: ResultType.success,
+          title: 'Berhasil',
+          description: 'Data warga berhasil disimpan.',
+          actionLabel: 'Selesai',
+          autoProceed: true,
+        );
+
+        // Kembali ke halaman daftar warga dengan hasil 'true'
+        if (mounted) context.pop(true);
+      }
+    } catch (e) {
+      if (mounted) {
+        await showResultModal(
+          context,
+          type: ResultType.error,
+          title: 'Error',
+          description: 'Gagal menyimpan data: $e',
+          actionLabel: 'Coba Lagi',
+        );
+      }
+    } finally {
+      setState(() => _isSaving = false);
+    }
+  }
 
   @override
   void dispose() {
     _namaCtl.dispose();
-    _nikCtl.dispose();
+    _idCtl.dispose();
     _ttlCtl.dispose();
+    _tempatLahirCtl.dispose();
+    _teleponCtl.dispose();
+    _emailCtl.dispose();
     super.dispose();
   }
 
@@ -72,7 +207,7 @@ class _TambahWargaPageState extends State<TambahWargaPage> {
               const SizedBox(height: 8),
               LabeledTextField(
                 label: 'NIK',
-                controller: _nikCtl,
+                controller: _idCtl,
                 keyboardType: TextInputType.number,
                 hint: 'Masukkan NIK',
               ),
@@ -89,19 +224,20 @@ class _TambahWargaPageState extends State<TambahWargaPage> {
           SectionCard(
             title: 'Atribut Personal',
             children: [
-              LabeledDropdown<String>(
+              LabeledDropdown<Gender>(
                 label: 'Jenis Kelamin',
                 value: _jenisKelamin,
                 onChanged: (v) => setState(() => _jenisKelamin = v),
-                items: const [
-                  DropdownMenuItem(
-                    value: 'Laki-laki',
-                    child: Text('Laki-laki'),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('-- Pilih --'),
                   ),
-                  DropdownMenuItem(
-                    value: 'Perempuan',
-                    child: Text('Perempuan'),
-                  ),
+                  ...Gender.values.map((gender) =>
+                      DropdownMenuItem(
+                        value: gender,
+                        child: Text(gender.value),
+                      )),
                 ],
               ),
               LabeledDropdown<String>(
@@ -117,15 +253,20 @@ class _TambahWargaPageState extends State<TambahWargaPage> {
                   DropdownMenuItem(value: 'Konghucu', child: Text('Konghucu')),
                 ],
               ),
-              LabeledDropdown<String>(
+              LabeledDropdown<GolonganDarah>(
                 label: 'Golongan Darah',
                 value: _golDarah,
                 onChanged: (v) => setState(() => _golDarah = v),
-                items: const [
-                  DropdownMenuItem(value: 'A', child: Text('A')),
-                  DropdownMenuItem(value: 'B', child: Text('B')),
-                  DropdownMenuItem(value: 'AB', child: Text('AB')),
-                  DropdownMenuItem(value: 'O', child: Text('O')),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('-- Pilih --'),
+                  ),
+                  ...GolonganDarah.values.map((gol) =>
+                      DropdownMenuItem(
+                        value: gol,
+                        child: Text(gol.value),
+                      )),
                 ],
               ),
             ],
@@ -137,17 +278,19 @@ class _TambahWargaPageState extends State<TambahWargaPage> {
             children: [
               LabeledDropdown<String>(
                 label: 'Keluarga',
-                value: _keluarga,
-                onChanged: (v) => setState(() => _keluarga = v),
-                items: const [
+                value: _keluargaId,
+                onChanged: (v) => setState(() => _keluargaId = v),
+                items: [
                   DropdownMenuItem(
-                    value: 'Keluarga Besar Mojokerto',
-                    child: Text('Keluarga Besar Mojokerto'),
+                    value: null,
+                    child: Text(_isLoading ? 'Loading...' : '-- Pilih Keluarga --'),
                   ),
-                  DropdownMenuItem(
-                    value: 'Keluarga Besar Blitar',
-                    child: Text('Keluarga Besar Blitar'),
-                  ),
+                  if (!_isLoading)
+                    ..._keluargaList.map((keluarga) =>
+                        DropdownMenuItem(
+                          value: keluarga.id,
+                          child: Text(keluarga.namaKeluarga),
+                        )),
                 ],
               ),
               LabeledDropdown<String>(
@@ -172,13 +315,20 @@ class _TambahWargaPageState extends State<TambahWargaPage> {
                   DropdownMenuItem(value: 'Wafat', child: Text('Wafat')),
                 ],
               ),
-              LabeledDropdown<String>(
+              LabeledDropdown<StatusPenduduk>(
                 label: 'Status Kependudukan',
                 value: _statusPenduduk,
                 onChanged: (v) => setState(() => _statusPenduduk = v),
-                items: const [
-                  DropdownMenuItem(value: 'Aktif', child: Text('Aktif')),
-                  DropdownMenuItem(value: 'Nonaktif', child: Text('Nonaktif')),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('-- Pilih --'),
+                  ),
+                  ...StatusPenduduk.values.map((status) =>
+                      DropdownMenuItem(
+                        value: status,
+                        child: Text(status.value),
+                      )),
                 ],
               ),
             ],
@@ -243,20 +393,18 @@ class _TambahWargaPageState extends State<TambahWargaPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: () async {
-                  // TODO: Simpan data
-                  await showResultModal(
-                    context,
-                    type: ResultType.success,
-                    title: 'Berhasil',
-                    description: 'Data warga berhasil disimpan.',
-                    actionLabel: 'Selesai',
-                    autoProceed: true,
-                  );
-                  // Kembali ke halaman daftar warga
-                  if (context.mounted) context.pop();
-                },
-                child: const Text('Simpan'),
+                onPressed: _isSaving ? null : () => _saveWarga(),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text('Simpan'),
               ),
             ),
           ),
